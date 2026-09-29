@@ -26,9 +26,21 @@ export const queryPdfContext = async (question) => {
     embeddings,
     getQdrantConfig(),
   );
-  const relevantDocs = await vectorStore.similaritySearch(question, 4);
+  const candidates = await vectorStore.similaritySearchWithScore(question, 8);
+  const scoreThreshold = Number(process.env.RAG_RELEVANCE_THRESHOLD || 0.45);
+  const relevantDocs = candidates
+    .filter(([, score]) => score >= scoreThreshold)
+    .slice(0, 4)
+    .map(([doc]) => doc);
+
+  console.log('Qdrant similarity scores:', candidates.map(([, score]) => score));
+
+  if (relevantDocs.length === 0) {
+    return "I couldn't find relevant information in the provided documents.";
+  }
+
   const context = relevantDocs.map((doc) => doc.pageContent).join('\n\n');
-	console.log("the context is here ",context);
+	console.log("context ", context);
 
   const prompt = `You are a helpful assistant. Answer the user's question ONLY based on the provided context below.
 If the context does not contain the answer, say "I couldn't find relevant information in the provided documents."
@@ -40,9 +52,8 @@ Question:
 ${question}
 
 Answer:`;
-	console.log("response before ",prompt);
+	// return {"content" : "testing"};
   const response = await llm.invoke(prompt);
-	console.log("response after");
   return typeof response.content === 'string'
     ? response.content
     : response.content.map((part) => (typeof part === 'string' ? part : part.text || '')).join('');

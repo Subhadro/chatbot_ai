@@ -64,6 +64,11 @@ router.post('/query', async (req, res) => {
     res.status(200).json({ answer });
   } catch (error) {
     console.error('Query Error:', error);
+    if (error.status === 429) {
+      return res.status(429).json({
+        error: 'Gemini API quota or rate limit exceeded. Retry later or check your API plan.',
+      });
+    }
     res.status(500).json({ error: 'Failed to retrieve answer from PDF' });
   }
 });
